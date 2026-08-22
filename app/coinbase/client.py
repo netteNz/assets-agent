@@ -30,7 +30,7 @@ class CoinbaseClient:
             headers["Authorization"] = "Bearer " + build_rest_jwt(
                 key_id=self.settings.coinbase_api_key_id,
                 private_key_pem=self.settings.coinbase_api_key_secret.get_secret_value(),
-                method="GET", host=self._host, path=path,
+                method="GET", host=self._host, path=path.split("?", 1)[0],
             )
         try:
             response = await self._client.get(f"{self._base_url}{path}", headers=headers)
@@ -55,4 +55,31 @@ class CoinbaseClient:
 
     async def get_product(self, product_id: str) -> dict:
         return await self._get(f"/api/v3/brokerage/market/products/{product_id}", authenticated=False)
+
+    async def list_fills(self) -> list[dict]:
+        fills: list[dict] = []
+        path = "/api/v3/brokerage/orders/historical/fills?limit=100"
+        for _ in range(500):
+            payload = await self._get(path, authenticated=True)
+            batch = payload.get("fills", [])
+            if not batch:
+                break
+            fills.extend(batch)
+            cursor = payload.get("cursor")
+            if not cursor:
+                break
+            path = f"/api/v3/brokerage/orders/historical/fills?limit=100&cursor={cursor}"
+        return fills
+
+    async def get_candles(self, product_id: str, *, granularity: str, start: str, end: str) -> list[dict]:
+        payload = await self._get(
+            f"/api/v3/brokerage/market/products/{product_id}/candles?start={start}&end={end}&granularity={granularity}",
+            authenticated=False,
+        )
+        return payload.get("candles", [])
+
+    async def get_best_bid_ask(self, product_ids: list[str]) -> list[dict]:
+        query = "&".join(f"product_ids={pid}" for pid in product_ids)
+        payload = await self._get(f"/api/v3/brokerage/best_bid_ask?{query}", authenticated=True)
+        return payload.get("pricebooks", [])
 

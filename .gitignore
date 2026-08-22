@@ -3,6 +3,9 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+captures/
 
 docs/CODEX_HANDOFF_COINBASE_FOUNDRY_SERVERLESS.md
 docs/system_prompt.md
+
+bash.exe.stackdump

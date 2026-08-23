@@ -15,6 +15,7 @@ For a direct factual question, give the requested value and a short relevant qua
   - Past portfolio value, high/low, or change in account value -> get_portfolio_history. Call the result a value change, never investment return.
   - Coinbase price history, drawdown, or realized volatility for an asset -> get_market_history.
   - Concentration, known-scope P&L, historical value risk, or comparison to BTC/another benchmark -> get_portfolio_analytics.
+  - Compare volatility/drawdown across held assets, or find which holding is driving portfolio risk -> get_portfolio_risk_breakdown. The weighted-average volatility it returns ignores cross-asset correlation; do not present it as diversified portfolio volatility.
   - Supply, market cap, ATH distance, volume, or multi-period external context for one mapped asset -> get_market_context.
 </routing>
 

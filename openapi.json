@@ -526,10 +526,150 @@
           }
         }
       }
+    },
+    "/api/portfolio/risk-breakdown": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Compare volatility and drawdown across held assets",
+        "description": "Ranks the portfolio's top holdings by their own historical volatility and drawdown, using per-asset Coinbase candle history. Use to find which holding is driving portfolio risk.",
+        "operationId": "get_portfolio_risk_breakdown",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "7d",
+                "30d",
+                "90d",
+                "1y"
+              ],
+              "type": "string",
+              "default": "30d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 25,
+              "minimum": 1,
+              "description": "Maximum number of top-value holdings to include; bounds the number of Coinbase candle requests.",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "Maximum number of top-value holdings to include; bounds the number of Coinbase candle requests."
+          },
+          {
+            "name": "min_value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Minimum USD value for a holding to be included; excludes dust positions from the candle fetches below.",
+              "default": "1.00",
+              "title": "Min Value"
+            },
+            "description": "Minimum USD value for a holding to be included; excludes dust positions from the candle fetches below."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRiskBreakdownResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AssetRisk": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "allocation_pct": {
+            "title": "Allocation Pct",
+            "description": "Percent of total valued holdings. Null when the portfolio total is zero.",
+            "type": "string",
+            "nullable": true
+          },
+          "change_pct": {
+            "title": "Change Pct",
+            "description": "Value change over the period for this asset's Coinbase product. Null when candle history is unavailable.",
+            "type": "string",
+            "nullable": true
+          },
+          "max_drawdown_pct": {
+            "title": "Max Drawdown Pct",
+            "description": "Same availability as change_pct.",
+            "type": "string",
+            "nullable": true
+          },
+          "realized_volatility_pct": {
+            "title": "Realized Volatility Pct",
+            "description": "Annualized sample volatility of log returns. Null with fewer than two returns or unavailable candle history.",
+            "type": "string",
+            "nullable": true
+          },
+          "data_available": {
+            "type": "boolean",
+            "title": "Data Available",
+            "description": "False when the Coinbase candle fetch for this asset's product failed; other fields are then null, not zero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "value",
+          "allocation_pct",
+          "data_available"
+        ],
+        "title": "AssetRisk"
+      },
       "ErrorDetail": {
         "properties": {
           "error": {
@@ -1279,6 +1419,57 @@
         ],
         "title": "PortfolioHistoryResponse"
       },
+      "PortfolioRiskBreakdownResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRisk"
+            },
+            "type": "array",
+            "title": "Holdings",
+            "description": "Top holdings by current value, sorted by realized_volatility_pct descending (holdings with unavailable data last)."
+          },
+          "holdings_priced": {
+            "type": "integer",
+            "title": "Holdings Priced",
+            "description": "Count of holdings included, i.e. priced, non-stablecoin, and at or above min_value, up to the requested limit."
+          },
+          "holdings_with_risk_data": {
+            "type": "integer",
+            "title": "Holdings With Risk Data",
+            "description": "Count of included holdings whose Coinbase candle fetch succeeded."
+          },
+          "weighted_avg_volatility_pct": {
+            "title": "Weighted Avg Volatility Pct",
+            "description": "Allocation-weighted average of each included asset's own realized volatility. Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.",
+            "type": "string",
+            "nullable": true
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "holdings",
+          "holdings_priced",
+          "holdings_with_risk_data",
+          "weighted_avg_volatility_pct",
+          "retrieved_at"
+        ],
+        "title": "PortfolioRiskBreakdownResponse"
+      },
       "PortfolioSummaryResponse": {
         "properties": {
           "currency": {
@@ -1470,7 +1661,7 @@
   ],
   "servers": [
     {
-      "url": "https://6afa-72-186-122-112.ngrok-free.app"
+      "url": "https://9ec3-72-186-122-112.ngrok-free.app"
     }
   ]
 }

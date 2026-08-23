@@ -24,7 +24,7 @@ def test_missing_or_invalid_key_is_unauthorized() -> None:
 def test_openapi_has_only_foundry_operations_and_api_key_security() -> None:
     schema = TestClient(app).get("/openapi.json").json()
     operations = {operation["operationId"] for path in schema["paths"].values() for operation in path.values()}
-    assert operations == {"get_portfolio_summary", "get_holdings", "get_market_price", "get_portfolio_history", "get_market_history", "get_portfolio_analytics", "get_market_context"}
+    assert operations == {"get_portfolio_summary", "get_holdings", "get_market_price", "get_portfolio_history", "get_market_history", "get_portfolio_analytics", "get_market_context", "get_portfolio_risk_breakdown"}
     scheme = schema["components"]["securitySchemes"]["APIKeyHeader"]
     assert scheme == {"type": "apiKey", "in": "header", "name": "X-API-Key"}
 
@@ -266,7 +266,10 @@ def test_stablecoin_holding_priced_at_one_without_upstream_call(monkeypatch) -> 
 
     monkeypatch.setattr(portfolio_service, "CoinbaseClient", FakeCoinbaseClient)
     response = TestClient(app).get("/api/portfolio/summary", headers={"X-API-Key": "test-key"})
-    assert response.json()["total_value"] == "10.00"
+    body = response.json()
+    assert body["total_value"] == "10.00"
+    assert body["cash_value"] == "10.00"
+    assert body["crypto_value"] == "0.00"
 
 
 def test_holdings_include_market_context(monkeypatch) -> None:

@@ -162,6 +162,26 @@ class PortfolioAnalyticsResponse(BaseModel):
     retrieved_at: str
 
 
+class AssetRisk(BaseModel):
+    symbol: str
+    value: str
+    allocation_pct: str | None = Field(description="Percent of total valued holdings. Null when the portfolio total is zero.")
+    change_pct: str | None = Field(default=None, description="Value change over the period for this asset's Coinbase product. Null when candle history is unavailable.")
+    max_drawdown_pct: str | None = Field(default=None, description="Same availability as change_pct.")
+    realized_volatility_pct: str | None = Field(default=None, description="Annualized sample volatility of log returns. Null with fewer than two returns or unavailable candle history.")
+    data_available: bool = Field(description="False when the Coinbase candle fetch for this asset's product failed; other fields are then null, not zero.")
+
+
+class PortfolioRiskBreakdownResponse(BaseModel):
+    currency: str = "USD"
+    period: str
+    holdings: list[AssetRisk] = Field(description="Top holdings by current value, sorted by realized_volatility_pct descending (holdings with unavailable data last).")
+    holdings_priced: int = Field(description="Count of holdings included, i.e. priced, non-stablecoin, and at or above min_value, up to the requested limit.")
+    holdings_with_risk_data: int = Field(description="Count of included holdings whose Coinbase candle fetch succeeded.")
+    weighted_avg_volatility_pct: str | None = Field(description="Allocation-weighted average of each included asset's own realized volatility. Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.")
+    retrieved_at: str
+
+
 class ErrorDetail(BaseModel):
     error: str
     message: str | None = None

@@ -19,7 +19,7 @@ async def _price(client: CoinbaseClient, symbol: str) -> Decimal | None:
     try:
         return Decimal((await client.get_product(f"{symbol}-USD"))["price"])
     except CoinbaseError as exc:
-        if exc.status_code == 404:
+        if exc.status_code in (404, 429):
             return None
         raise
 

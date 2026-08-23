@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 import logging
 import time
@@ -15,10 +15,10 @@ from app.coinbase.client import CoinbaseClient, CoinbaseError
 from app.coinbase.normalize import money
 from app.config import get_settings
 from app.history import PortfolioHistoryRepository, PortfolioSnapshot
-from app.market_analytics import normalize_candles
+from app.market_analytics import market_metrics, normalize_candles
 from app.portfolio_analytics import aligned_returns, concentration, correlation_and_beta, high_low, max_drawdown_pct, realized_volatility_pct, value_change
-from app.portfolio_service import get_holdings_data
-from app.schemas import ErrorDetail, HistoryPoint, PortfolioAnalyticsResponse, PortfolioHistoryResponse
+from app.portfolio_service import STABLECOINS, get_holdings_data
+from app.schemas import AssetRisk, ErrorDetail, HistoryPoint, PortfolioAnalyticsResponse, PortfolioHistoryResponse, PortfolioRiskBreakdownResponse
 
 router = APIRouter(dependencies=[Depends(require_api_key)])
 logger = logging.getLogger(__name__)
@@ -120,3 +120,45 @@ async def get_portfolio_analytics(
         retrieved_at=now.isoformat().replace("+00:00", "Z"))
     logger.info("portfolio_analytics_complete period=%s benchmark=%s latency_ms=%d", period, benchmark, (time.monotonic() - started) * 1000)
     return response
+
+
+@router.get("/api/portfolio/risk-breakdown", operation_id="get_portfolio_risk_breakdown", summary="Compare volatility and drawdown across held assets", description="Ranks the portfolio's top holdings by their own historical volatility and drawdown, using per-asset Coinbase candle history. Use to find which holding is driving portfolio risk.", response_model=PortfolioRiskBreakdownResponse, responses={503: {"model": ErrorDetail}})
+async def get_portfolio_risk_breakdown(
+    period: Literal["7d", "30d", "90d", "1y"] = Query("30d"),
+    limit: int = Query(10, ge=1, le=25, description="Maximum number of top-value holdings to include; bounds the number of Coinbase candle requests."),
+    min_value: str = Query("1.00", description="Minimum USD value for a holding to be included; excludes dust positions from the candle fetches below."),
+) -> PortfolioRiskBreakdownResponse:
+    now = datetime.now(UTC)
+    try:
+        min_value_decimal = Decimal(min_value)
+    except InvalidOperation:
+        raise HTTPException(422, detail={"error": "invalid_min_value", "message": "min_value must be a decimal number."})
+    items, _, _ = await get_holdings_data()
+    candidates = [item for item in items if item["symbol"] not in STABLECOINS and item.get("value") is not None and item["value"] >= min_value_decimal][:limit]
+    client = CoinbaseClient(get_settings())
+    rows: list[dict] = []
+    try:
+        for item in candidates:
+            try:
+                raw = await client.get_candles(f"{item['symbol']}-USD", granularity="ONE_DAY", start=str(int((now - timedelta(days=PERIOD_DAYS[period])).timestamp())), end=str(int(now.timestamp())))
+                candles = normalize_candles(raw)
+                metrics = market_metrics(candles, 365)
+                rows.append({**item, **metrics, "data_available": True})
+            except CoinbaseError:
+                rows.append({**item, "change_pct": None, "max_drawdown_pct": None, "realized_volatility_pct": None, "data_available": False})
+    finally:
+        await client.aclose()
+    rows.sort(key=lambda row: (row["realized_volatility_pct"] is None, -row["realized_volatility_pct"] if row["realized_volatility_pct"] is not None else 0))
+    weighted = [row["allocation_pct"] * row["realized_volatility_pct"] for row in rows if row.get("allocation_pct") is not None and row["realized_volatility_pct"] is not None]
+    weighted_avg_volatility_pct = sum(weighted, Decimal("0")) / Decimal("100") if weighted else None
+    return PortfolioRiskBreakdownResponse(
+        period=period,
+        holdings=[AssetRisk(symbol=row["symbol"], value=money(row["value"]), allocation_pct=money(row["allocation_pct"]) if row.get("allocation_pct") is not None else None,
+                             change_pct=money(row["change_pct"]) if row.get("change_pct") is not None else None,
+                             max_drawdown_pct=money(row["max_drawdown_pct"]) if row.get("max_drawdown_pct") is not None else None,
+                             realized_volatility_pct=money(row["realized_volatility_pct"]) if row.get("realized_volatility_pct") is not None else None,
+                             data_available=row["data_available"]) for row in rows],
+        holdings_priced=len(candidates), holdings_with_risk_data=sum(row["data_available"] for row in rows),
+        weighted_avg_volatility_pct=money(weighted_avg_volatility_pct) if weighted_avg_volatility_pct is not None else None,
+        retrieved_at=now.isoformat().replace("+00:00", "Z"),
+    )

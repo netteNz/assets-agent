@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth import require_api_key
 from app.coinbase.normalize import ZERO, money, number
-from app.portfolio_service import get_holdings_data
+from app.portfolio_service import STABLECOINS, get_holdings_data
 from app.schemas import ErrorDetail, Holding, HoldingsResponse, PortfolioSummaryResponse
 from app.portfolio_analytics import concentration, cost_basis_summary
 
@@ -62,7 +62,7 @@ async def get_portfolio_summary(
 ) -> PortfolioSummaryResponse:
     items, cost_basis_available, market_context_available = await get_holdings_data(include_cost_basis, include_market_context)
     total = sum((item["value"] for item in items if item["value"] is not None), ZERO)
-    cash = sum((item["value"] for item in items if item["symbol"] == "USD" and item["value"] is not None), ZERO)
+    cash = sum((item["value"] for item in items if item["symbol"] in STABLECOINS and item["value"] is not None), ZERO)
     unpriced = sum(1 for item in items if item["value"] is None)
 
     cost_basis_value = unrealized_pnl = unrealized_pnl_pct = None

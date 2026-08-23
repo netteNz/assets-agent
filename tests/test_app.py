@@ -28,6 +28,20 @@ def test_openapi_has_only_foundry_operations_and_api_key_security() -> None:
     assert scheme == {"type": "apiKey", "in": "header", "name": "X-API-Key"}
 
 
+def test_openapi_response_schemas_carry_field_descriptions() -> None:
+    schema = TestClient(app).get("/openapi.json").json()
+    schemas = schema["components"]["schemas"]
+    assert schemas["Holding"]["properties"]["cost_basis"]["description"]
+    assert schemas["HoldingsResponse"]["properties"]["cost_basis_available"]["description"]
+    assert schemas["PortfolioSummaryResponse"]["properties"]["holdings_with_unknown_cost_basis"]["description"]
+    assert schemas["MarketPriceResponse"]["properties"]["market_cap_rank"]["description"]
+
+    paths = schema["paths"]
+    for op, code in [("/api/portfolio/holdings", "503"), ("/api/portfolio/summary", "503"), ("/api/market/{product_id}", "400"), ("/api/market/{product_id}", "503")]:
+        ref = paths[op]["get"]["responses"][code]["content"]["application/json"]["schema"]["$ref"]
+        assert ref.endswith("ErrorDetail")
+
+
 def test_invalid_product_is_rejected_before_upstream_call() -> None:
     response = TestClient(app).get("/api/market/BTC-USD/evil", headers={"X-API-Key": "test-key"})
     assert response.status_code == 404
@@ -61,7 +75,10 @@ def test_summary_filters_zero_balances_and_uses_decimal_values(monkeypatch) -> N
     assert body["cash_value"] == "10.01"
     assert body["holding_count"] == 2
     assert body["top_holdings"][0]["allocation_pct"] == "55.22"
-    assert "cost_basis_available" not in body
+    assert body["cost_basis_available"] is None
+    assert body["market_context_available"] is None
+    assert body["holdings_with_unknown_cost_basis"] is None
+    assert body["holdings_with_unknown_price"] == 0
 
 
 def _fills_client(accounts, fills, product_prices):
@@ -275,7 +292,7 @@ def test_market_context_omitted_by_default(monkeypatch) -> None:
     monkeypatch.setattr(portfolio, "CoinGeckoClient", FailingCoinGeckoClient)
     response = TestClient(app).get("/api/portfolio/holdings", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
-    assert "market_cap_rank" not in response.json()["holdings"][0]
+    assert response.json()["holdings"][0]["market_cap_rank"] is None
 
 
 def test_market_context_failure_degrades_gracefully(monkeypatch) -> None:

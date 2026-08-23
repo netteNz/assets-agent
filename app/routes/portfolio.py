@@ -9,6 +9,7 @@ from app.coinbase.cost_basis import compute_average_cost_basis
 from app.coinbase.normalize import ZERO, account_quantity, account_symbol, money, number
 from app.coingecko.client import CoinGeckoClient, CoinGeckoError
 from app.config import get_settings
+from app.schemas import ErrorDetail, Holding, HoldingsResponse, PortfolioSummaryResponse
 
 router = APIRouter(dependencies=[Depends(require_api_key)])
 
@@ -86,24 +87,21 @@ async def _holdings(include_cost_basis: bool = False, include_market_context: bo
         await client.aclose()
 
 
-def _render(items: list[dict], include_cost_basis: bool = False, include_market_context: bool = False) -> list[dict]:
-    rendered = []
-    for item in items:
-        entry = {
-            "symbol": item["symbol"], "name": item["name"], "quantity": number(item["quantity"]),
-            "price": money(item["price"]) if item["price"] is not None else None,
-            "value": money(item["value"]) if item["value"] is not None else None,
-            "allocation_pct": money(item["allocation_pct"]) if item["allocation_pct"] is not None else None,
-        }
-        if include_cost_basis:
-            entry["cost_basis"] = money(item["cost_basis"]) if item.get("cost_basis") is not None else None
-            entry["unrealized_pnl"] = money(item["unrealized_pnl"]) if item.get("unrealized_pnl") is not None else None
-            entry["unrealized_pnl_pct"] = money(item["unrealized_pnl_pct"]) if item.get("unrealized_pnl_pct") is not None else None
-        if include_market_context:
-            entry["market_cap_rank"] = item.get("market_cap_rank")
-            entry["market_cap"] = money(item["market_cap"]) if item.get("market_cap") is not None else None
-        rendered.append(entry)
-    return rendered
+def _render(items: list[dict]) -> list[Holding]:
+    return [
+        Holding(
+            symbol=item["symbol"], name=item["name"], quantity=number(item["quantity"]),
+            price=money(item["price"]) if item["price"] is not None else None,
+            value=money(item["value"]) if item["value"] is not None else None,
+            allocation_pct=money(item["allocation_pct"]) if item["allocation_pct"] is not None else None,
+            cost_basis=money(item["cost_basis"]) if item.get("cost_basis") is not None else None,
+            unrealized_pnl=money(item["unrealized_pnl"]) if item.get("unrealized_pnl") is not None else None,
+            unrealized_pnl_pct=money(item["unrealized_pnl_pct"]) if item.get("unrealized_pnl_pct") is not None else None,
+            market_cap_rank=item.get("market_cap_rank"),
+            market_cap=money(item["market_cap"]) if item.get("market_cap") is not None else None,
+        )
+        for item in items
+    ]
 
 
 @router.get(
@@ -111,18 +109,19 @@ def _render(items: list[dict], include_cost_basis: bool = False, include_market_
     operation_id="get_holdings",
     summary="Get current non-zero Coinbase holdings",
     description="Returns current non-zero Coinbase asset balances, quantities, USD values, and allocation percentages. Use for owned assets or portfolio composition.",
+    response_model=HoldingsResponse,
+    responses={503: {"model": ErrorDetail}},
 )
 async def get_holdings(
     include_cost_basis: bool = Query(False, description="Include cost basis and unrealized P&L per holding, derived from fills history."),
     include_market_context: bool = Query(False, description="Include CoinGecko market cap rank and market cap per holding, for interpretation and analysis."),
-) -> dict:
+) -> HoldingsResponse:
     items, cost_basis_available, market_context_available = await _holdings(include_cost_basis, include_market_context)
-    body = {"currency": "USD", "holdings": _render(items, include_cost_basis, include_market_context), "retrieved_at": datetime.now(UTC).isoformat().replace("+00:00", "Z")}
-    if include_cost_basis:
-        body["cost_basis_available"] = cost_basis_available
-    if include_market_context:
-        body["market_context_available"] = market_context_available
-    return body
+    return HoldingsResponse(
+        currency="USD", holdings=_render(items), retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        cost_basis_available=cost_basis_available if include_cost_basis else None,
+        market_context_available=market_context_available if include_market_context else None,
+    )
 
 
 @router.get(
@@ -130,31 +129,36 @@ async def get_holdings(
     operation_id="get_portfolio_summary",
     summary="Get the user's current Coinbase portfolio value and summarized positions",
     description="Returns the user's current Coinbase portfolio value and summarized positions. Use for total portfolio value or overall portfolio status.",
+    response_model=PortfolioSummaryResponse,
+    responses={503: {"model": ErrorDetail}},
 )
 async def get_portfolio_summary(
     include_cost_basis: bool = Query(False, description="Include aggregate cost basis and unrealized P&L, derived from fills history."),
     include_market_context: bool = Query(False, description="Include CoinGecko market cap rank and market cap on top holdings, for interpretation and analysis."),
-) -> dict:
+) -> PortfolioSummaryResponse:
     items, cost_basis_available, market_context_available = await _holdings(include_cost_basis, include_market_context)
     total = sum((item["value"] for item in items if item["value"] is not None), ZERO)
     cash = sum((item["value"] for item in items if item["symbol"] == "USD" and item["value"] is not None), ZERO)
     unpriced = sum(1 for item in items if item["value"] is None)
-    body = {
-        "currency": "USD", "total_value": money(total), "crypto_value": money(total - cash), "cash_value": money(cash),
-        "holding_count": len(items), "top_holdings": _render(items[:5], include_cost_basis, include_market_context),
-        "retrieved_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-    }
-    if unpriced:
-        body["holdings_with_unknown_price"] = unpriced
-    if include_market_context:
-        body["market_context_available"] = market_context_available
+
+    cost_basis_value = unrealized_pnl = unrealized_pnl_pct = None
+    holdings_with_unknown_cost_basis = None
     if include_cost_basis:
         known = [item for item in items if item.get("cost_basis") is not None]
         cost_basis_total = sum((item["cost_basis"] for item in known), ZERO)
         unrealized_pnl_total = sum((item["unrealized_pnl"] for item in known), ZERO)
-        body["cost_basis_available"] = cost_basis_available
-        body["cost_basis_value"] = money(cost_basis_total) if known else None
-        body["unrealized_pnl"] = money(unrealized_pnl_total) if known else None
-        body["unrealized_pnl_pct"] = money(unrealized_pnl_total / cost_basis_total * Decimal("100")) if cost_basis_total > ZERO else None
-        body["holdings_with_unknown_cost_basis"] = len(items) - len(known)
-    return body
+        cost_basis_value = money(cost_basis_total) if known else None
+        unrealized_pnl = money(unrealized_pnl_total) if known else None
+        unrealized_pnl_pct = money(unrealized_pnl_total / cost_basis_total * Decimal("100")) if cost_basis_total > ZERO else None
+        holdings_with_unknown_cost_basis = len(items) - len(known)
+
+    return PortfolioSummaryResponse(
+        currency="USD", total_value=money(total), crypto_value=money(total - cash), cash_value=money(cash),
+        holding_count=len(items), top_holdings=_render(items[:5]),
+        retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        holdings_with_unknown_price=unpriced,
+        cost_basis_available=cost_basis_available if include_cost_basis else None,
+        cost_basis_value=cost_basis_value, unrealized_pnl=unrealized_pnl, unrealized_pnl_pct=unrealized_pnl_pct,
+        holdings_with_unknown_cost_basis=holdings_with_unknown_cost_basis,
+        market_context_available=market_context_available if include_market_context else None,
+    )

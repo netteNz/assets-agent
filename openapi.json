@@ -1,0 +1,766 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Coinbase Portfolio API",
+    "description": "Read-only live Coinbase portfolio and USD market data.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/portfolio/holdings": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get current non-zero Coinbase holdings",
+        "description": "Returns current non-zero Coinbase asset balances, quantities, USD values, and allocation percentages. Use for owned assets or portfolio composition.",
+        "operationId": "get_holdings",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_cost_basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include cost basis and unrealized P&L per holding, derived from fills history.",
+              "default": false,
+              "title": "Include Cost Basis"
+            },
+            "description": "Include cost basis and unrealized P&L per holding, derived from fills history."
+          },
+          {
+            "name": "include_market_context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include CoinGecko market cap rank and market cap per holding, for interpretation and analysis.",
+              "default": false,
+              "title": "Include Market Context"
+            },
+            "description": "Include CoinGecko market cap rank and market cap per holding, for interpretation and analysis."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/summary": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get the user's current Coinbase portfolio value and summarized positions",
+        "description": "Returns the user's current Coinbase portfolio value and summarized positions. Use for total portfolio value or overall portfolio status.",
+        "operationId": "get_portfolio_summary",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_cost_basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include aggregate cost basis and unrealized P&L, derived from fills history.",
+              "default": false,
+              "title": "Include Cost Basis"
+            },
+            "description": "Include aggregate cost basis and unrealized P&L, derived from fills history."
+          },
+          {
+            "name": "include_market_context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include CoinGecko market cap rank and market cap on top holdings, for interpretation and analysis.",
+              "default": false,
+              "title": "Include Market Context"
+            },
+            "description": "Include CoinGecko market cap rank and market cap on top holdings, for interpretation and analysis."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioSummaryResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/{product_id}": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get a live Coinbase USD product price",
+        "description": "Returns the current Coinbase price for a requested product such as BTC-USD or ETH-USD. Use for live price questions.",
+        "operationId": "get_market_price",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketPriceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorDetail": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorDetail"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Holding": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "USD price; null when Coinbase has no SYMBOL-USD product (unknown, not zero)."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "quantity * price; null when price is null."
+          },
+          "allocation_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Pct",
+            "description": "Percent of total valued holdings; null when value is null or the portfolio total is zero."
+          },
+          "cost_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis",
+            "description": "Average-cost basis in USD, derived from fills history. Present only when include_cost_basis=true. Null = unknown (no fills history for this asset), not zero."
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl",
+            "description": "value - cost_basis. Same availability as cost_basis."
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct",
+            "description": "unrealized_pnl / cost_basis * 100. Null if cost_basis is null or zero."
+          },
+          "market_cap_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Rank",
+            "description": "CoinGecko market cap rank. Present only when include_market_context=true. Null = not listed on CoinGecko, not unranked-zero."
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap",
+            "description": "USD market cap. Same availability as market_cap_rank."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "name",
+          "quantity",
+          "price",
+          "value",
+          "allocation_pct"
+        ],
+        "title": "Holding"
+      },
+      "HoldingsResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "cost_basis_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Available",
+            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream (holdings' cost_basis fields are then all null). True otherwise."
+          },
+          "market_context_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Context Available",
+            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "holdings",
+          "retrieved_at"
+        ],
+        "title": "HoldingsResponse"
+      },
+      "MarketPriceResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "price": {
+            "type": "string",
+            "title": "Price"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "change_24h_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 24H Pct",
+            "description": "24h percent change. Null when candle history is unavailable, not zero change."
+          },
+          "change_7d_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 7D Pct",
+            "description": "7d percent change. Null when candle history is unavailable, not zero change."
+          },
+          "bid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bid",
+            "description": "Best bid. Null when the order book is empty or unavailable."
+          },
+          "ask": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask",
+            "description": "Best ask. Null when the order book is empty or unavailable."
+          },
+          "spread_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spread Pct",
+            "description": "(ask - bid) / ask * 100. Null when bid or ask is null."
+          },
+          "market_cap_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Rank",
+            "description": "CoinGecko market cap rank. Null when CoinGecko does not list this asset."
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap",
+            "description": "USD market cap. Null when CoinGecko does not list this asset."
+          },
+          "ath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ath",
+            "description": "All-time-high USD price per CoinGecko. Null when CoinGecko does not list this asset."
+          },
+          "ath_change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ath Change Pct",
+            "description": "Percent change from ath to the current price. Null when ath is null."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "price",
+          "currency",
+          "change_24h_pct",
+          "change_7d_pct",
+          "bid",
+          "ask",
+          "spread_pct",
+          "market_cap_rank",
+          "market_cap",
+          "ath",
+          "ath_change_pct",
+          "retrieved_at"
+        ],
+        "title": "MarketPriceResponse"
+      },
+      "PortfolioSummaryResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "total_value": {
+            "type": "string",
+            "title": "Total Value"
+          },
+          "crypto_value": {
+            "type": "string",
+            "title": "Crypto Value"
+          },
+          "cash_value": {
+            "type": "string",
+            "title": "Cash Value"
+          },
+          "holding_count": {
+            "type": "integer",
+            "title": "Holding Count"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "type": "array",
+            "title": "Top Holdings"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "holdings_with_unknown_price": {
+            "type": "integer",
+            "title": "Holdings With Unknown Price",
+            "description": "Count of held assets with no priceable Coinbase product. 0 when all are priced."
+          },
+          "cost_basis_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Available",
+            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream. True otherwise."
+          },
+          "cost_basis_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Value",
+            "description": "Sum of known cost bases across holdings. Null when include_cost_basis=false or no holding has a known cost basis."
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl",
+            "description": "Sum of unrealized P&L across holdings with a known cost basis. Same availability as cost_basis_value."
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct",
+            "description": "unrealized_pnl / cost_basis_value * 100. Null if cost_basis_value is null or zero."
+          },
+          "holdings_with_unknown_cost_basis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings With Unknown Cost Basis",
+            "description": "Null when include_cost_basis=false. Count of holdings with unknown cost basis otherwise (may be 0)."
+          },
+          "market_context_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Context Available",
+            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "total_value",
+          "crypto_value",
+          "cash_value",
+          "holding_count",
+          "top_holdings",
+          "retrieved_at",
+          "holdings_with_unknown_price"
+        ],
+        "title": "PortfolioSummaryResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "portfolio"
+    },
+    {
+      "name": "market"
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://814e-72-186-122-112.ngrok-free.app"
+    }
+  ]
+}

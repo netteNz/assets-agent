@@ -9,6 +9,7 @@ from app.coinbase.client import CoinbaseClient, CoinbaseError
 from app.coingecko.client import CoinGeckoClient, CoinGeckoError
 from app.config import get_settings
 from app.coinbase.normalize import money
+from app.schemas import ErrorDetail, MarketPriceResponse
 
 router = APIRouter(dependencies=[Depends(require_api_key)])
 PRODUCT_ID = re.compile(r"^[A-Z0-9]{2,20}-USD$")
@@ -68,8 +69,10 @@ async def _market_context(base_symbol: str) -> dict:
     operation_id="get_market_price",
     summary="Get a live Coinbase USD product price",
     description="Returns the current Coinbase price for a requested product such as BTC-USD or ETH-USD. Use for live price questions.",
+    response_model=MarketPriceResponse,
+    responses={400: {"model": ErrorDetail}, 503: {"model": ErrorDetail}},
 )
-async def get_market_price(product_id: str) -> dict:
+async def get_market_price(product_id: str) -> MarketPriceResponse:
     product_id = product_id.upper()
     if not PRODUCT_ID.fullmatch(product_id):
         raise HTTPException(400, detail={"error": "invalid_product", "message": "The requested Coinbase product is invalid or unsupported."})
@@ -86,13 +89,13 @@ async def get_market_price(product_id: str) -> dict:
         await client.aclose()
     price = Decimal(product["price"])
     context = await _market_context(product_id.split("-")[0])
-    return {
-        "product_id": product_id, "price": money(price), "currency": "USD",
-        "change_24h_pct": money(change_24h_pct) if change_24h_pct is not None else None,
-        "change_7d_pct": money(change_7d_pct) if change_7d_pct is not None else None,
-        "bid": money(bid) if bid is not None else None,
-        "ask": money(ask) if ask is not None else None,
-        "spread_pct": money(spread_pct) if spread_pct is not None else None,
+    return MarketPriceResponse(
+        product_id=product_id, price=money(price), currency="USD",
+        change_24h_pct=money(change_24h_pct) if change_24h_pct is not None else None,
+        change_7d_pct=money(change_7d_pct) if change_7d_pct is not None else None,
+        bid=money(bid) if bid is not None else None,
+        ask=money(ask) if ask is not None else None,
+        spread_pct=money(spread_pct) if spread_pct is not None else None,
         **context,
-        "retrieved_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-    }
+        retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    )

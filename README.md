@@ -45,7 +45,7 @@ See [deployment instructions](deploy/README.md). The included GitHub workflow ex
 2. In the Foundry project, create a custom-key connection whose key is `X-API-Key` and value is the same random value stored as the Container App `portfolio-api-key` secret.
 3. Attach the OpenAPI schema to the agent with project-connection authentication. The security scheme is already declared as an `apiKey` header.
 4. Apply [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md) as the agent instructions.
-5. Ask for a portfolio value, holdings, and `BTC-USD` price. The first request after idle may cold-start the app.
+5. Ask for a portfolio value, holdings (optionally with cost basis or market-cap context), and a `BTC-USD` price with market context. The first request after idle may cold-start the app.
 
 Foundry currently requires every exposed operation to have an `operationId`, and API-key injection depends on the schema security scheme matching the project connection header name. The health route is deliberately absent from the OpenAPI schema.
 
@@ -54,5 +54,5 @@ Foundry currently requires every exposed operation to have an `operationId`, and
 - Product IDs are restricted to uppercase `BASE-USD`, preventing path injection and non-USD valuation ambiguity.
 - Public product reads avoid using Coinbase account credentials for market data; account reads remain authenticated.
 - Values use `Decimal` and are serialized as strings, preventing binary floating-point drift.
-- The implementation assumes spot account balances. Futures, margin, cost basis, and P/L are outside v1.
+- The implementation assumes spot account balances. Futures and margin are outside v1; cost basis and P/L are derived from fills history via an opt-in `include_cost_basis` flag.
 

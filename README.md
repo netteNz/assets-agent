@@ -1,6 +1,6 @@
 # Coinbase Foundry portfolio API
 
-A personal, read-only FastAPI adapter that exposes live Coinbase Advanced Trade balances and USD product prices to a Microsoft Foundry OpenAPI tool. It has no trading, transfer, persistence, background job, cache, or user-management functionality.
+A personal, read-only FastAPI adapter that exposes live Coinbase Advanced Trade balances, USD market data, and manually captured portfolio history to a Microsoft Foundry OpenAPI tool. It has no trading, transfer, scheduling, or user-management functionality.
 
 ## Security boundary
 
@@ -26,6 +26,14 @@ curl -H "X-API-Key: $PORTFOLIO_API_KEY" http://127.0.0.1:8000/openapi.json
 pytest
 ```
 
+Portfolio history is intentionally captured manually, never through an HTTP route or background scheduler:
+
+```bash
+python -m app.capture_snapshot
+```
+
+Snapshots are stored only in SQLite at `PORTFOLIO_HISTORY_DB_PATH` (default: `data/portfolio_history.db`). One capture is retained per UTC hour, so repeating the command within that hour is idempotent. History starts at the first successful capture; the API never backfills or invents points.
+
 ## Docker
 
 ```bash
@@ -41,7 +49,7 @@ See [deployment instructions](deploy/README.md). The included GitHub workflow ex
 
 ## Foundry setup
 
-1. Open `<app-url>/openapi.json` and confirm its three operations.
+1. Open `<app-url>/openapi.json` and confirm its seven operations: `get_holdings`, `get_portfolio_summary`, `get_market_price`, `get_portfolio_history`, `get_market_history`, `get_portfolio_analytics`, and `get_market_context`.
 2. In the Foundry project, create a custom-key connection whose key is `X-API-Key` and value is the same random value stored as the Container App `portfolio-api-key` secret.
 3. Attach the OpenAPI schema to the agent with project-connection authentication. The security scheme is already declared as an `apiKey` header.
 4. Apply [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md) as the agent instructions.
@@ -54,5 +62,7 @@ Foundry currently requires every exposed operation to have an `operationId`, and
 - Product IDs are restricted to uppercase `BASE-USD`, preventing path injection and non-USD valuation ambiguity.
 - Public product reads avoid using Coinbase account credentials for market data; account reads remain authenticated.
 - Values use `Decimal` and are serialized as strings, preventing binary floating-point drift.
-- The implementation assumes spot account balances. Futures and margin are outside v1; cost basis and P/L are derived from fills history via an opt-in `include_cost_basis` flag.
+- The implementation assumes spot account balances. Futures and margin are outside V2; cost basis and P/L are derived from fills history via an opt-in `include_cost_basis` flag and are shown only when fills fully explain the current position.
+- Coinbase is the only market-history source. CoinGecko provides optional broader context only for explicitly mapped Coinbase symbols; an unmapped symbol returns unavailable/null context rather than a ticker guess.
+- All historical portfolio change fields are changes in observed account value, not cash-flow-adjusted investment returns. Deposits and withdrawals are not modeled.
 

@@ -1,5 +1,5 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "Coinbase Portfolio API",
     "description": "Read-only live Coinbase portfolio and USD market data.",
@@ -219,6 +219,313 @@
           }
         }
       }
+    },
+    "/api/market/{product_id}/history": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get normalized Coinbase USD candle history",
+        "description": "Returns Coinbase-only candle history and deterministic price-risk metrics. Approved period/granularity combinations cap output at 150 candles.",
+        "operationId": "get_market_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1d",
+                "7d",
+                "30d",
+                "90d",
+                "1y"
+              ],
+              "type": "string",
+              "default": "7d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1h",
+                "6h",
+                "1d"
+              ],
+              "type": "string",
+              "default": "1h",
+              "title": "Granularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/{product_id}/context": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get mapped CoinGecko market context",
+        "description": "Returns broader optional CoinGecko context for explicitly mapped Coinbase assets. Unmapped assets and CoinGecko failures return null fields without substituting another asset.",
+        "operationId": "get_market_context",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketContextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get persisted portfolio value history",
+        "description": "Returns only manually captured SQLite snapshots. Change fields describe value change, not cash-flow-adjusted investment return.",
+        "operationId": "get_portfolio_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1d",
+                "7d",
+                "30d",
+                "90d",
+                "1y",
+                "all"
+              ],
+              "type": "string",
+              "default": "30d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "type": "string",
+              "default": "day",
+              "title": "Granularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/analytics": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get portfolio value, concentration, and benchmark analytics",
+        "description": "Combines live holdings, persisted snapshots, and aligned Coinbase benchmark candles. Value changes are not investment returns.",
+        "operationId": "get_portfolio_analytics",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1d",
+                "7d",
+                "30d",
+                "90d",
+                "1y",
+                "all"
+              ],
+              "type": "string",
+              "default": "30d",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "benchmark",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{2,20}-USD$",
+              "default": "BTC-USD",
+              "title": "Benchmark"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioAnalyticsResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -230,15 +537,9 @@
             "title": "Error"
           },
           "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
+            "title": "Message",
+            "type": "string",
+            "nullable": true
           }
         },
         "type": "object",
@@ -260,6 +561,44 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HistoryPoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "total_value": {
+            "type": "string",
+            "title": "Total Value"
+          },
+          "crypto_value": {
+            "title": "Crypto Value",
+            "type": "string",
+            "nullable": true
+          },
+          "cash_value": {
+            "title": "Cash Value",
+            "type": "string",
+            "nullable": true
+          },
+          "priced_value": {
+            "title": "Priced Value",
+            "type": "string",
+            "nullable": true
+          },
+          "unknown_price_count": {
+            "title": "Unknown Price Count",
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "total_value"
+        ],
+        "title": "HistoryPoint"
+      },
       "Holding": {
         "properties": {
           "symbol": {
@@ -275,100 +614,52 @@
             "title": "Quantity"
           },
           "price": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Price",
-            "description": "USD price; null when Coinbase has no SYMBOL-USD product (unknown, not zero)."
+            "description": "USD price; null when Coinbase has no SYMBOL-USD product (unknown, not zero).",
+            "type": "string",
+            "nullable": true
           },
           "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Value",
-            "description": "quantity * price; null when price is null."
+            "description": "quantity * price; null when price is null.",
+            "type": "string",
+            "nullable": true
           },
           "allocation_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Allocation Pct",
-            "description": "Percent of total valued holdings; null when value is null or the portfolio total is zero."
+            "description": "Percent of total valued holdings; null when value is null or the portfolio total is zero.",
+            "type": "string",
+            "nullable": true
           },
           "cost_basis": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Cost Basis",
-            "description": "Average-cost basis in USD, derived from fills history. Present only when include_cost_basis=true. Null = unknown (no fills history for this asset), not zero."
+            "description": "Average-cost basis in USD, derived from fills history. Present only when include_cost_basis=true. Null = unknown (no fills history for this asset), not zero.",
+            "type": "string",
+            "nullable": true
           },
           "unrealized_pnl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Unrealized Pnl",
-            "description": "value - cost_basis. Same availability as cost_basis."
+            "description": "value - cost_basis. Same availability as cost_basis.",
+            "type": "string",
+            "nullable": true
           },
           "unrealized_pnl_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Unrealized Pnl Pct",
-            "description": "unrealized_pnl / cost_basis * 100. Null if cost_basis is null or zero."
+            "description": "unrealized_pnl / cost_basis * 100. Null if cost_basis is null or zero.",
+            "type": "string",
+            "nullable": true
           },
           "market_cap_rank": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Cap Rank",
-            "description": "CoinGecko market cap rank. Present only when include_market_context=true. Null = not listed on CoinGecko, not unranked-zero."
+            "description": "CoinGecko market cap rank. Present only when include_market_context=true. Null = not listed on CoinGecko, not unranked-zero.",
+            "type": "integer",
+            "nullable": true
           },
           "market_cap": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Cap",
-            "description": "USD market cap. Same availability as market_cap_rank."
+            "description": "USD market cap. Same availability as market_cap_rank.",
+            "type": "string",
+            "nullable": true
           }
         },
         "type": "object",
@@ -400,28 +691,16 @@
             "title": "Retrieved At"
           },
           "cost_basis_available": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Cost Basis Available",
-            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream (holdings' cost_basis fields are then all null). True otherwise."
+            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream (holdings' cost_basis fields are then all null). True otherwise.",
+            "type": "boolean",
+            "nullable": true
           },
           "market_context_available": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Context Available",
-            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise."
+            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise.",
+            "type": "boolean",
+            "nullable": true
           }
         },
         "type": "object",
@@ -431,6 +710,245 @@
           "retrieved_at"
         ],
         "title": "HoldingsResponse"
+      },
+      "MarketCandle": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "open": {
+            "type": "string",
+            "title": "Open"
+          },
+          "high": {
+            "type": "string",
+            "title": "High"
+          },
+          "low": {
+            "type": "string",
+            "title": "Low"
+          },
+          "close": {
+            "type": "string",
+            "title": "Close"
+          },
+          "volume": {
+            "type": "string",
+            "title": "Volume"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "MarketCandle"
+      },
+      "MarketContextResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "market_context_available": {
+            "type": "boolean",
+            "title": "Market Context Available"
+          },
+          "coin_id": {
+            "title": "Coin Id",
+            "type": "string",
+            "nullable": true
+          },
+          "market_cap_rank": {
+            "title": "Market Cap Rank",
+            "type": "integer",
+            "nullable": true
+          },
+          "market_cap": {
+            "title": "Market Cap",
+            "type": "string",
+            "nullable": true
+          },
+          "fully_diluted_valuation": {
+            "title": "Fully Diluted Valuation",
+            "type": "string",
+            "nullable": true
+          },
+          "circulating_supply": {
+            "title": "Circulating Supply",
+            "type": "string",
+            "nullable": true
+          },
+          "total_supply": {
+            "title": "Total Supply",
+            "type": "string",
+            "nullable": true
+          },
+          "max_supply": {
+            "title": "Max Supply",
+            "type": "string",
+            "nullable": true
+          },
+          "ath": {
+            "title": "Ath",
+            "type": "string",
+            "nullable": true
+          },
+          "ath_change_pct": {
+            "title": "Ath Change Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "total_volume": {
+            "title": "Total Volume",
+            "type": "string",
+            "nullable": true
+          },
+          "volume_market_cap_ratio": {
+            "title": "Volume Market Cap Ratio",
+            "type": "string",
+            "nullable": true
+          },
+          "change_24h_pct": {
+            "title": "Change 24H Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "change_7d_pct": {
+            "title": "Change 7D Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "change_30d_pct": {
+            "title": "Change 30D Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "change_1y_pct": {
+            "title": "Change 1Y Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "market_context_available",
+          "coin_id",
+          "market_cap_rank",
+          "market_cap",
+          "fully_diluted_valuation",
+          "circulating_supply",
+          "total_supply",
+          "max_supply",
+          "ath",
+          "ath_change_pct",
+          "total_volume",
+          "volume_market_cap_ratio",
+          "change_24h_pct",
+          "change_7d_pct",
+          "change_30d_pct",
+          "change_1y_pct",
+          "retrieved_at"
+        ],
+        "title": "MarketContextResponse"
+      },
+      "MarketHistoryResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity"
+          },
+          "candles": {
+            "items": {
+              "$ref": "#/components/schemas/MarketCandle"
+            },
+            "type": "array",
+            "title": "Candles"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "change_value": {
+            "title": "Change Value",
+            "type": "string",
+            "nullable": true
+          },
+          "change_pct": {
+            "title": "Change Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "high": {
+            "title": "High",
+            "type": "string",
+            "nullable": true
+          },
+          "low": {
+            "title": "Low",
+            "type": "string",
+            "nullable": true
+          },
+          "max_drawdown_pct": {
+            "title": "Max Drawdown Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "realized_volatility_pct": {
+            "title": "Realized Volatility Pct",
+            "description": "Annualized sample volatility of log returns; null with fewer than two returns.",
+            "type": "string",
+            "nullable": true
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "period",
+          "granularity",
+          "candles",
+          "point_count",
+          "change_value",
+          "change_pct",
+          "high",
+          "low",
+          "max_drawdown_pct",
+          "realized_volatility_pct",
+          "retrieved_at"
+        ],
+        "title": "MarketHistoryResponse"
       },
       "MarketPriceResponse": {
         "properties": {
@@ -447,112 +965,63 @@
             "title": "Currency"
           },
           "change_24h_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Change 24H Pct",
-            "description": "24h percent change. Null when candle history is unavailable, not zero change."
+            "description": "24h percent change. Null when candle history is unavailable, not zero change.",
+            "type": "string",
+            "nullable": true
           },
           "change_7d_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Change 7D Pct",
-            "description": "7d percent change. Null when candle history is unavailable, not zero change."
+            "description": "7d percent change. Null when candle history is unavailable, not zero change.",
+            "type": "string",
+            "nullable": true
           },
           "bid": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Bid",
-            "description": "Best bid. Null when the order book is empty or unavailable."
+            "description": "Best bid. Null when the order book is empty or unavailable.",
+            "type": "string",
+            "nullable": true
           },
           "ask": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Ask",
-            "description": "Best ask. Null when the order book is empty or unavailable."
+            "description": "Best ask. Null when the order book is empty or unavailable.",
+            "type": "string",
+            "nullable": true
           },
           "spread_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Spread Pct",
-            "description": "(ask - bid) / ask * 100. Null when bid or ask is null."
+            "description": "(ask - bid) / ask * 100. Null when bid or ask is null.",
+            "type": "string",
+            "nullable": true
           },
           "market_cap_rank": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Cap Rank",
-            "description": "CoinGecko market cap rank. Null when CoinGecko does not list this asset."
+            "description": "CoinGecko market cap rank. Null when CoinGecko does not list this asset.",
+            "type": "integer",
+            "nullable": true
           },
           "market_cap": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Cap",
-            "description": "USD market cap. Null when CoinGecko does not list this asset."
+            "description": "USD market cap. Null when CoinGecko does not list this asset.",
+            "type": "string",
+            "nullable": true
           },
           "ath": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Ath",
-            "description": "All-time-high USD price per CoinGecko. Null when CoinGecko does not list this asset."
+            "description": "All-time-high USD price per CoinGecko. Null when CoinGecko does not list this asset.",
+            "type": "string",
+            "nullable": true
           },
           "ath_change_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Ath Change Pct",
-            "description": "Percent change from ath to the current price. Null when ath is null."
+            "description": "Percent change from ath to the current price. Null when ath is null.",
+            "type": "string",
+            "nullable": true
+          },
+          "market_context_available": {
+            "type": "boolean",
+            "title": "Market Context Available",
+            "description": "False when optional CoinGecko context is unavailable; live Coinbase price is still valid."
           },
           "retrieved_at": {
             "type": "string",
@@ -573,9 +1042,242 @@
           "market_cap",
           "ath",
           "ath_change_pct",
+          "market_context_available",
           "retrieved_at"
         ],
         "title": "MarketPriceResponse"
+      },
+      "PortfolioAnalyticsResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "benchmark": {
+            "type": "string",
+            "title": "Benchmark"
+          },
+          "current_total_value": {
+            "type": "string",
+            "title": "Current Total Value"
+          },
+          "history_available": {
+            "type": "boolean",
+            "title": "History Available"
+          },
+          "coverage_start": {
+            "title": "Coverage Start",
+            "type": "string",
+            "nullable": true
+          },
+          "coverage_end": {
+            "title": "Coverage End",
+            "type": "string",
+            "nullable": true
+          },
+          "value_change": {
+            "title": "Value Change",
+            "description": "Portfolio value change, not investment return.",
+            "type": "string",
+            "nullable": true
+          },
+          "value_change_pct": {
+            "title": "Value Change Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "high_value": {
+            "title": "High Value",
+            "type": "string",
+            "nullable": true
+          },
+          "low_value": {
+            "title": "Low Value",
+            "type": "string",
+            "nullable": true
+          },
+          "max_drawdown_pct": {
+            "title": "Max Drawdown Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "realized_volatility_pct": {
+            "title": "Realized Volatility Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "concentration": {
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            },
+            "type": "object",
+            "title": "Concentration"
+          },
+          "pnl_scope_value": {
+            "title": "Pnl Scope Value",
+            "type": "string",
+            "nullable": true
+          },
+          "cost_basis_coverage_pct": {
+            "title": "Cost Basis Coverage Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "unrealized_pnl": {
+            "title": "Unrealized Pnl",
+            "type": "string",
+            "nullable": true
+          },
+          "benchmark_change_pct": {
+            "title": "Benchmark Change Pct",
+            "type": "string",
+            "nullable": true
+          },
+          "correlation": {
+            "title": "Correlation",
+            "type": "string",
+            "nullable": true
+          },
+          "beta": {
+            "title": "Beta",
+            "type": "string",
+            "nullable": true
+          },
+          "data_quality": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "nullable": true
+            },
+            "type": "object",
+            "title": "Data Quality"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "benchmark",
+          "current_total_value",
+          "history_available",
+          "coverage_start",
+          "coverage_end",
+          "value_change",
+          "value_change_pct",
+          "high_value",
+          "low_value",
+          "max_drawdown_pct",
+          "realized_volatility_pct",
+          "concentration",
+          "pnl_scope_value",
+          "cost_basis_coverage_pct",
+          "unrealized_pnl",
+          "benchmark_change_pct",
+          "correlation",
+          "beta",
+          "data_quality",
+          "retrieved_at"
+        ],
+        "title": "PortfolioAnalyticsResponse"
+      },
+      "PortfolioHistoryResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "granularity": {
+            "type": "string",
+            "title": "Granularity"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "coverage_start": {
+            "title": "Coverage Start",
+            "type": "string",
+            "nullable": true
+          },
+          "coverage_end": {
+            "title": "Coverage End",
+            "type": "string",
+            "nullable": true
+          },
+          "change_value": {
+            "title": "Change Value",
+            "description": "Change in portfolio value, not cash-flow-adjusted investment return.",
+            "type": "string",
+            "nullable": true
+          },
+          "change_pct": {
+            "title": "Change Pct",
+            "description": "Percent change in portfolio value, not investment return.",
+            "type": "string",
+            "nullable": true
+          },
+          "high_value": {
+            "title": "High Value",
+            "type": "string",
+            "nullable": true
+          },
+          "low_value": {
+            "title": "Low Value",
+            "type": "string",
+            "nullable": true
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "granularity",
+          "points",
+          "point_count",
+          "available",
+          "coverage_start",
+          "coverage_end",
+          "change_value",
+          "change_pct",
+          "high_value",
+          "low_value",
+          "retrieved_at"
+        ],
+        "title": "PortfolioHistoryResponse"
       },
       "PortfolioSummaryResponse": {
         "properties": {
@@ -616,76 +1318,84 @@
             "description": "Count of held assets with no priceable Coinbase product. 0 when all are priced."
           },
           "cost_basis_available": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Cost Basis Available",
-            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream. True otherwise."
+            "description": "Null when include_cost_basis=false. False when the fills lookup failed upstream. True otherwise.",
+            "type": "boolean",
+            "nullable": true
           },
           "cost_basis_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Cost Basis Value",
-            "description": "Sum of known cost bases across holdings. Null when include_cost_basis=false or no holding has a known cost basis."
+            "description": "Sum of known cost bases across holdings. Null when include_cost_basis=false or no holding has a known cost basis.",
+            "type": "string",
+            "nullable": true
           },
           "unrealized_pnl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Unrealized Pnl",
-            "description": "Sum of unrealized P&L across holdings with a known cost basis. Same availability as cost_basis_value."
+            "description": "Sum of unrealized P&L across holdings with a known cost basis. Same availability as cost_basis_value.",
+            "type": "string",
+            "nullable": true
           },
           "unrealized_pnl_pct": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Unrealized Pnl Pct",
-            "description": "unrealized_pnl / cost_basis_value * 100. Null if cost_basis_value is null or zero."
+            "description": "unrealized_pnl / cost_basis_value * 100. Null if cost_basis_value is null or zero.",
+            "type": "string",
+            "nullable": true
           },
           "holdings_with_unknown_cost_basis": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Holdings With Unknown Cost Basis",
-            "description": "Null when include_cost_basis=false. Count of holdings with unknown cost basis otherwise (may be 0)."
+            "description": "Null when include_cost_basis=false. Count of holdings with unknown cost basis otherwise (may be 0).",
+            "type": "integer",
+            "nullable": true
           },
           "market_context_available": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "title": "Market Context Available",
-            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise."
+            "description": "Null when include_market_context=false. False when CoinGecko failed upstream. True otherwise.",
+            "type": "boolean",
+            "nullable": true
+          },
+          "concentration": {
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            },
+            "type": "object",
+            "title": "Concentration",
+            "description": "Current valued-holding concentration metrics; unavailable metrics are null."
+          },
+          "pnl_scope_value": {
+            "title": "Pnl Scope Value",
+            "description": "Current value covered by fully fill-traceable cost basis. Null when fills retrieval failed or was not requested.",
+            "type": "string",
+            "nullable": true
+          },
+          "cost_basis_coverage_pct": {
+            "title": "Cost Basis Coverage Pct",
+            "description": "Percent of priced current value inside the known P&L scope.",
+            "type": "string",
+            "nullable": true
+          },
+          "profitable_count": {
+            "title": "Profitable Count",
+            "type": "integer",
+            "nullable": true
+          },
+          "losing_count": {
+            "title": "Losing Count",
+            "type": "integer",
+            "nullable": true
+          },
+          "flat_count": {
+            "title": "Flat Count",
+            "type": "integer",
+            "nullable": true
+          },
+          "largest_known_gain": {
+            "$ref": "#/components/schemas/Holding",
+            "nullable": true
+          },
+          "largest_known_loss": {
+            "$ref": "#/components/schemas/Holding",
+            "nullable": true
           }
         },
         "type": "object",
@@ -760,7 +1470,7 @@
   ],
   "servers": [
     {
-      "url": "https://814e-72-186-122-112.ngrok-free.app"
+      "url": "https://6afa-72-186-122-112.ngrok-free.app"
     }
   ]
 }

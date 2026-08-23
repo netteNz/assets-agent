@@ -1,9 +1,13 @@
 from urllib.parse import urlparse
+import logging
+import time
 
 import httpx
 
 from app.coinbase.auth import build_rest_jwt
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class CoinbaseError(Exception):
@@ -33,14 +37,19 @@ class CoinbaseClient:
                 method="GET", host=self._host, path=path.split("?", 1)[0],
             )
         try:
+            started = time.monotonic()
             response = await self._client.get(f"{self._base_url}{path}", headers=headers)
             response.raise_for_status()
+            logger.info("coinbase_request endpoint=%s status=%s latency_ms=%d", path.split("?", 1)[0], response.status_code, (time.monotonic() - started) * 1000)
             return response.json()
         except httpx.TimeoutException as exc:
+            logger.warning("coinbase_request_failed endpoint=%s reason=timeout", path.split("?", 1)[0])
             raise CoinbaseError() from exc
         except httpx.HTTPStatusError as exc:
+            logger.warning("coinbase_request_failed endpoint=%s status=%s", path.split("?", 1)[0], exc.response.status_code)
             raise CoinbaseError(exc.response.status_code) from exc
         except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("coinbase_request_failed endpoint=%s reason=transport", path.split("?", 1)[0])
             raise CoinbaseError() from exc
 
     async def list_accounts(self) -> list[dict]:

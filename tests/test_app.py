@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routes import market, portfolio
+from app import portfolio_service
 
 
 def test_health_has_no_authentication_or_upstream_work() -> None:
@@ -23,7 +24,7 @@ def test_missing_or_invalid_key_is_unauthorized() -> None:
 def test_openapi_has_only_foundry_operations_and_api_key_security() -> None:
     schema = TestClient(app).get("/openapi.json").json()
     operations = {operation["operationId"] for path in schema["paths"].values() for operation in path.values()}
-    assert operations == {"get_portfolio_summary", "get_holdings", "get_market_price"}
+    assert operations == {"get_portfolio_summary", "get_holdings", "get_market_price", "get_portfolio_history", "get_market_history", "get_portfolio_analytics", "get_market_context"}
     scheme = schema["components"]["securitySchemes"]["APIKeyHeader"]
     assert scheme == {"type": "apiKey", "in": "header", "name": "X-API-Key"}
 
@@ -40,6 +41,15 @@ def test_openapi_response_schemas_carry_field_descriptions() -> None:
     for op, code in [("/api/portfolio/holdings", "503"), ("/api/portfolio/summary", "503"), ("/api/market/{product_id}", "400"), ("/api/market/{product_id}", "503")]:
         ref = paths[op]["get"]["responses"][code]["content"]["application/json"]["schema"]["$ref"]
         assert ref.endswith("ErrorDetail")
+
+
+def test_checked_in_openapi_matches_runtime_contract() -> None:
+    import json
+    from pathlib import Path
+
+    runtime = TestClient(app).get("/openapi.json").json()
+    tracked = json.loads(Path("openapi.json").read_text())
+    assert tracked == runtime
 
 
 def test_invalid_product_is_rejected_before_upstream_call() -> None:
@@ -66,7 +76,7 @@ def test_summary_filters_zero_balances_and_uses_decimal_values(monkeypatch) -> N
             raise AssertionError("list_fills should not be called when include_cost_basis is omitted")
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", FakeCoinbaseClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", FakeCoinbaseClient)
     response = TestClient(app).get("/api/portfolio/summary", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()
@@ -104,7 +114,7 @@ def test_holdings_include_cost_basis_average_cost(monkeypatch) -> None:
         _fill("BTC-USD", "BUY", "0.5", "20000", "2024-01-01T00:00:00Z"),
         _fill("BTC-USD", "BUY", "0.5", "25000", "2024-02-01T00:00:00Z"),
     ]
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "30000"}))
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "30000"}))
     response = TestClient(app).get("/api/portfolio/holdings?include_cost_basis=true", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()
@@ -122,7 +132,7 @@ def test_sell_does_not_change_average_cost(monkeypatch) -> None:
         _fill("BTC-USD", "SELL", "0.4", "150", "2024-01-02T00:00:00Z"),
         _fill("BTC-USD", "BUY", "0.1", "100", "2024-01-03T00:00:00Z"),
     ]
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "100"}))
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "100"}))
     response = TestClient(app).get("/api/portfolio/holdings?include_cost_basis=true", headers={"X-API-Key": "test-key"})
     holding = response.json()["holdings"][0]
     assert holding["cost_basis"] == "70.00"
@@ -130,7 +140,7 @@ def test_sell_does_not_change_average_cost(monkeypatch) -> None:
 
 def test_holding_with_no_matching_fills_has_null_cost_basis(monkeypatch) -> None:
     accounts = [{"currency": "DOGE", "name": "Dogecoin", "available_balance": {"value": "5"}}]
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, [], {"DOGE-USD": "0.1"}))
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, [], {"DOGE-USD": "0.1"}))
     response = TestClient(app).get("/api/portfolio/holdings?include_cost_basis=true", headers={"X-API-Key": "test-key"})
     holding = response.json()["holdings"][0]
     assert holding["cost_basis"] is None
@@ -151,7 +161,7 @@ def test_list_fills_failure_degrades_gracefully(monkeypatch) -> None:
             raise CoinbaseError(500)
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", FailingFillsClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", FailingFillsClient)
     response = TestClient(app).get("/api/portfolio/holdings?include_cost_basis=true", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()
@@ -165,7 +175,7 @@ def test_summary_cost_basis_rollup_with_mixed_known_and_unknown(monkeypatch) -> 
         {"currency": "DOGE", "name": "Dogecoin", "available_balance": {"value": "5"}},
     ]
     fills = [_fill("BTC-USD", "BUY", "1.0", "100", "2024-01-01T00:00:00Z")]
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "150", "DOGE-USD": "0.1"}))
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, fills, {"BTC-USD": "150", "DOGE-USD": "0.1"}))
     response = TestClient(app).get("/api/portfolio/summary?include_cost_basis=true", headers={"X-API-Key": "test-key"})
     body = response.json()
     assert body["cost_basis_value"] == "100.00"
@@ -233,7 +243,7 @@ def test_holding_with_no_usd_product_does_not_fail_whole_request(monkeypatch) ->
             return {"price": "50000"}
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", FakeCoinbaseClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", FakeCoinbaseClient)
     response = TestClient(app).get("/api/portfolio/summary", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()
@@ -254,7 +264,7 @@ def test_stablecoin_holding_priced_at_one_without_upstream_call(monkeypatch) -> 
             raise AssertionError("stablecoins should not require a product lookup")
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", FakeCoinbaseClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", FakeCoinbaseClient)
     response = TestClient(app).get("/api/portfolio/summary", headers={"X-API-Key": "test-key"})
     assert response.json()["total_value"] == "10.00"
 
@@ -269,8 +279,8 @@ def test_holdings_include_market_context(monkeypatch) -> None:
             return {"BTC": {"market_cap_rank": 1, "market_cap": 1500000000000, "ath": 126080, "ath_change_percentage": -38.9}}
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
-    monkeypatch.setattr(portfolio, "CoinGeckoClient", FakeCoinGeckoClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
+    monkeypatch.setattr(portfolio_service, "CoinGeckoClient", FakeCoinGeckoClient)
     response = TestClient(app).get("/api/portfolio/holdings?include_market_context=true", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()
@@ -288,8 +298,8 @@ def test_market_context_omitted_by_default(monkeypatch) -> None:
         async def get_markets(self, symbols):
             raise AssertionError("get_markets should not be called when include_market_context is omitted")
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
-    monkeypatch.setattr(portfolio, "CoinGeckoClient", FailingCoinGeckoClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
+    monkeypatch.setattr(portfolio_service, "CoinGeckoClient", FailingCoinGeckoClient)
     response = TestClient(app).get("/api/portfolio/holdings", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     assert response.json()["holdings"][0]["market_cap_rank"] is None
@@ -306,8 +316,8 @@ def test_market_context_failure_degrades_gracefully(monkeypatch) -> None:
             raise CoinGeckoError(429)
         async def aclose(self): pass
 
-    monkeypatch.setattr(portfolio, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
-    monkeypatch.setattr(portfolio, "CoinGeckoClient", FailingCoinGeckoClient)
+    monkeypatch.setattr(portfolio_service, "CoinbaseClient", _fills_client(accounts, [], {"BTC-USD": "70000"}))
+    monkeypatch.setattr(portfolio_service, "CoinGeckoClient", FailingCoinGeckoClient)
     response = TestClient(app).get("/api/portfolio/holdings?include_market_context=true", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
     body = response.json()

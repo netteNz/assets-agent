@@ -112,3 +112,38 @@ def test_portfolio_analytics_returns_503_for_benchmark_failure(monkeypatch) -> N
 
     assert response.status_code == 503
     assert response.json()["error"] == "coinbase_unavailable"
+
+
+def test_risk_breakdown_weighted_volatility_renormalizes_over_covered_holdings(monkeypatch) -> None:
+    # SOL's candle fetch fails, so only BTC (30%) and ETH (20%) carry weight.
+    # Correct: (30*60 + 20*40) / 50 = 52. The old fixed-/100 formula gave 26.
+    async def fake_holdings(**_kwargs):
+        return [
+            {"symbol": "SOL", "value": Decimal("500"), "allocation_pct": Decimal("50")},
+            {"symbol": "BTC", "value": Decimal("300"), "allocation_pct": Decimal("30")},
+            {"symbol": "ETH", "value": Decimal("200"), "allocation_pct": Decimal("20")},
+        ], True, True
+
+    volatility = {"BTC-USD": Decimal("60"), "ETH-USD": Decimal("40")}
+
+    class FakeCoinbaseClient:
+        def __init__(self, *_): pass
+        async def get_candles(self, product_id, **_kwargs):
+            if product_id not in volatility:
+                raise CoinbaseError()
+            return product_id
+        async def aclose(self): pass
+
+    monkeypatch.setattr(history, "get_holdings_data", fake_holdings)
+    monkeypatch.setattr(history, "CoinbaseClient", FakeCoinbaseClient)
+    monkeypatch.setattr(history, "normalize_candles", lambda raw: raw)
+    monkeypatch.setattr(history, "market_metrics", lambda product_id, _days: {"change_pct": None, "max_drawdown_pct": None, "realized_volatility_pct": volatility[product_id]})
+
+    response = TestClient(app).get("/api/portfolio/risk-breakdown?period=30d", headers=HEADERS)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["holdings_priced"] == 3
+    assert body["holdings_with_risk_data"] == 2
+    assert body["weighted_avg_volatility_pct"] == "52.00"
+    assert [h["symbol"] for h in body["holdings"]] == ["BTC", "ETH", "SOL"]

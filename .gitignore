@@ -9,3 +9,5 @@ docs/CODEX_HANDOFF_COINBASE_FOUNDRY_SERVERLESS.md
 docs/system_prompt.md
 
 bash.exe.stackdump
+# Local portfolio snapshots (real balances) - never commit
+data/*.db

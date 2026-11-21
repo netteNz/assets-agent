@@ -149,8 +149,12 @@ async def get_portfolio_risk_breakdown(
     finally:
         await client.aclose()
     rows.sort(key=lambda row: (row["realized_volatility_pct"] is None, -row["realized_volatility_pct"] if row["realized_volatility_pct"] is not None else 0))
-    weighted = [row["allocation_pct"] * row["realized_volatility_pct"] for row in rows if row.get("allocation_pct") is not None and row["realized_volatility_pct"] is not None]
-    weighted_avg_volatility_pct = sum(weighted, Decimal("0")) / Decimal("100") if weighted else None
+    # Re-normalize over the holdings that actually carry volatility data. allocation_pct is a share of the
+    # whole portfolio, so dividing by a fixed 100 would treat stablecoins, dust, holdings past `limit`, and
+    # failed candle fetches as zero-volatility weight and bias the average low.
+    weighted_rows = [(row["allocation_pct"], row["realized_volatility_pct"]) for row in rows if row.get("allocation_pct") is not None and row["realized_volatility_pct"] is not None]
+    total_weight = sum((weight for weight, _ in weighted_rows), Decimal("0"))
+    weighted_avg_volatility_pct = sum((weight * vol for weight, vol in weighted_rows), Decimal("0")) / total_weight if total_weight > 0 else None
     return PortfolioRiskBreakdownResponse(
         period=period,
         holdings=[AssetRisk(symbol=row["symbol"], value=money(row["value"]), allocation_pct=money(row["allocation_pct"]) if row.get("allocation_pct") is not None else None,

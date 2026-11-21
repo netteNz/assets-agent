@@ -178,7 +178,7 @@ class PortfolioRiskBreakdownResponse(BaseModel):
     holdings: list[AssetRisk] = Field(description="Top holdings by current value, sorted by realized_volatility_pct descending (holdings with unavailable data last).")
     holdings_priced: int = Field(description="Count of holdings included, i.e. priced, non-stablecoin, and at or above min_value, up to the requested limit.")
     holdings_with_risk_data: int = Field(description="Count of included holdings whose Coinbase candle fetch succeeded.")
-    weighted_avg_volatility_pct: str | None = Field(description="Allocation-weighted average of each included asset's own realized volatility. Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.")
+    weighted_avg_volatility_pct: str | None = Field(description="Allocation-weighted average of each included asset's own realized volatility, with weights re-normalized over only the included assets that have volatility data (excluded holdings and failed fetches carry no weight). Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.")
     retrieved_at: str
 
 

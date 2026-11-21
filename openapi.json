@@ -1450,7 +1450,7 @@
           },
           "weighted_avg_volatility_pct": {
             "title": "Weighted Avg Volatility Pct",
-            "description": "Allocation-weighted average of each included asset's own realized volatility. Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.",
+            "description": "Allocation-weighted average of each included asset's own realized volatility, with weights re-normalized over only the included assets that have volatility data (excluded holdings and failed fetches carry no weight). Not diversified portfolio volatility: it ignores cross-asset correlation. Null when no included asset has volatility data.",
             "type": "string",
             "nullable": true
           },
